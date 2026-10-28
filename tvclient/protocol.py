@@ -135,11 +135,27 @@ def write_path(path: List[str]) -> bytes:
     return encoded
 
 
+# The most numbers an embedding can have. This is 2^16 - 1, because the
+# dimension is sent as a u16
+MAX_EMBEDDING_DIMENSION = 2**16 - 1
+
+# The largest number an f32 can hold, because embedding values are stored
+# as f32's
+MAX_FLOAT32 = 3.4028234663852886e38
+
+
+def validate_embedding(embedding: List[float]) -> None:
+    """Raises ValueError if the embedding can't be sent on the wire."""
+    if not 1 <= len(embedding) <= MAX_EMBEDDING_DIMENSION:
+        raise ValueError(f"embedding dimension {len(embedding)} is out of range")
+    # Also rejects NaN and infinity, which fail every comparison.
+    if not all(abs(x) <= MAX_FLOAT32 for x in embedding):
+        raise ValueError("embedding has values that don't fit in float32")
+
+
 def write_embedding(embedding: List[float]) -> bytes:
-    dimension = len(embedding)
-    if not 1 <= dimension <= 0xFFFF:
-        raise ValueError(f"embedding dimension must be between 1 and 65535, got {dimension}")
-    return struct.pack(f">H{dimension}f", dimension, *embedding)
+    validate_embedding(embedding)
+    return struct.pack(f">H{len(embedding)}f", len(embedding), *embedding)
 
 
 def encode_insert(
